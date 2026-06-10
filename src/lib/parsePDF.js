@@ -346,7 +346,11 @@ function classifyRow(text) {
   // Totals are sourced in the meta pass; here they are simply skipped. Chrome is
   // skipped too (recorded in debug, not dropped). Reconciliation is the backstop
   // for any value-bearing line that ever hides in this shape.
-  if (/^(Subtotal|TOTAL GST 15%|TOTAL NZD|Amount Due)\b/.test(text)) {
+  // No trailing \b: "TOTAL GST 15%" ends in "%" (a non-word char), so a word
+  // boundary never matches there and the GST line would leak into chrome. These
+  // labels are line prefixes and product lines start with digits, so a plain
+  // prefix match is safe.
+  if (/^(Subtotal|TOTAL GST 15%|TOTAL NZD|Amount Due)/.test(text)) {
     return { class: "total" };
   }
   return { class: "chrome" };
