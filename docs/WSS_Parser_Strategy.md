@@ -235,7 +235,7 @@ notSupplied[]}, reviewRows[], reconciliation, debug }`.
 | No text layer at all | **Hard stop** | "This PDF has no readable text — it may be a scan." |
 | Zero products parsed | **Hard stop** | "No items found — check this is a Wholesale Solutions invoice." |
 | Missing date / reference / supplier | Warn + continue | Fallback (today / blank / default name); recorded in `meta` + `debug.warnings`. |
-| Missing printed **Subtotal** | Warn + continue | Completeness check marked **indeterminate** (can't verify); surfaced prominently; Start still gated by user (override). Not a hard stop. |
+| Missing printed **Subtotal** | **Hard stop** | "Subtotal not found — cannot reconcile this invoice." The completeness check is the parser's core guarantee; without the printed anchor it cannot run, so we refuse rather than present an unverifiable parse. |
 | Missing GST or Total | Warn | Skip the affected total identity check; flag. |
 | Row matches no class | Review row | Surfaced for product / not-a-product / skip. |
 | Wrapped row never completes (no triple in window) | Review row | Raw buffer + reason. |
@@ -245,9 +245,10 @@ notSupplied[]}, reviewRows[], reconciliation, debug }`.
 | Non-integer qty / >2dp unit (suspected) | Handled / flagged | Numeric path is generic; sub-cent effect absorbed by tolerance or caught per-line. |
 | New WSS line type (suspected) | Review row | Classifier never assumes; degrades, never strands. |
 
-Principle, per architecture: **only "zero products" and "no text layer" hard-stop.**
-Everything else warns-and-continues or routes to review/reconciliation so the user
-is never stranded.
+Principle: **three conditions hard-stop — no text layer, zero products, and a
+missing printed Subtotal** (the reconciliation anchor). Everything else
+warns-and-continues or routes to review/reconciliation so the user is never
+stranded.
 
 ---
 
