@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.2",
+    "papaparse": "^5.5.3",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

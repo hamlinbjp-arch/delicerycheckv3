@@ -23,20 +23,28 @@ This is a personal, offline, single-user tool. It does **not** have, and we will
 When a choice exists between a simple approach and a complex one, take the simple
 one and say why.
 
-## Current phase: PARSER ONLY
+## Current phase: PERSISTENCE + RESUMABLE SESSION
 
-We are building and validating the WSS invoice parser. Until I explicitly say
-otherwise, do **not** build:
-- matching logic
-- CSV import / Idealpos identity
-- localStorage / persistence
-- the delivery workflow
-- price history
-- manual links
-- the checklist UI
+**Done and frozen** (validated against real data; don't change their output shape
+without flagging it first):
+- the WSS invoice parser (`src/lib/parsePDF.js`)
+- the Idealpos export ingest + identity sets (`src/lib/parseIdealpos.js`)
+- the matching core (`src/lib/utils.js` — `matchItem()`, `trackingKey()`)
 
-The only exception is a minimal, single-page test harness whose sole purpose is to
-validate the parser. No app routing, no other components.
+**Now building:** durable persistence and the resumable in-progress delivery
+(`localStorage`) — the durable stores (`active_session`, Idealpos export,
+`manual_links`, `delivery_log`), storage-check on launch, throttled session writes,
+backup/restore, and the Resume-on-launch flow. Manual links land here as the override
+layer the matching core already consumes. Follow the architecture's durability rules
+(home-screen install, backup-on-confirm and backup-on-link-change, prominent Restore).
+
+Until I explicitly say otherwise, do **not** build:
+- price history — neither the `price_history` store, its pre-population/seeding, nor
+  the price-change detection. That is the next phase, not this one.
+- any UI: the checklist, reconciliation-recovery, end-of-delivery, the delivery workflow
+
+Test harnesses that validate the frozen modules headless are fine (the single-page
+parser harness, Node batch checks in `./tools/`). No delivery-workflow UI yet.
 
 ## Parser principles (from the architecture)
 
