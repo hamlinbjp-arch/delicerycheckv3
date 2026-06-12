@@ -23,37 +23,33 @@ This is a personal, offline, single-user tool. It does **not** have, and we will
 When a choice exists between a simple approach and a complex one, take the simple
 one and say why.
 
-## Current phase: PRICE HISTORY
+## Current phase: DELIVERY WORKFLOW + UI
 
-**Done and frozen** (validated/built; don't change their output shape or behaviour
-without flagging it first):
+**All lib and hook layers are done and frozen** (validated/built; don't change their
+output shapes or behaviour without flagging it first). Components consume these as-is:
 - the WSS invoice parser (`src/lib/parsePDF.js`)
 - the Idealpos export ingest + identity sets (`src/lib/parseIdealpos.js`)
-- the matching core (`src/lib/utils.js` — `matchItem()`, `trackingKey()`)
+- the matching + price logic (`src/lib/utils.js` — `matchItem()`, `trackingKey()`,
+  `detectPriceChange()`, `suggestedSellPrice()`, `prePopulatePriceHistory()`)
 - the persistence layer (`src/hooks/useAppData.js`, `src/hooks/useDeliverySession.js`)
-  — the existing stores (`active_session`, Idealpos export, `manual_links`,
-  `delivery_log`), backup/restore, throttled session writes, and Resume-on-launch
+  — all stores (`active_session`, Idealpos export, `manual_links`, `delivery_log`,
+  `price_history`), backup/restore (v2), throttled session writes, Resume-on-launch
 
-**Now building:** the `price_history` store (keyed by **tracking key**), its
-**pre-population from the Idealpos export**, and **price-change detection**:
-- pre-pop rule: for each export row with `LSTCST > 0`, seed `{ lastCost, lastSellPrice,
-  lastInvoice: "idealpos-import", lastDate }` — **never overwrite** an existing entry,
-  **skip blank `SUPPCODE`** rows.
-- `detectPriceChange()` and `suggestedSellPrice()` in `utils.js` (advisory; margin/
-  rounding from a setting). History is written **once per key on confirm**, only for
-  matched items with `qtyReceived > 0`.
-- Two in-scope extensions to the frozen persistence layer: **add the `price_history`
-  store alongside the existing stores in `useAppData.js`**, and **fold `price_history`
-  into the backup/restore payload** (architecture §Backup files).
+**Now building:** the React app — the full delivery workflow and UI, wiring the frozen
+interfaces beneath. This is the assembly phase (architecture §Component Structure,
+§Views, §User Flow):
+- `App.jsx` (tab + step router holding session state) and `BottomTabBar`, `ResumePrompt`
+- Delivery flow: `Setup` → `ReviewPanel` → `Reconciliation` → `MatchAndLink` →
+  `DeliveryChecklist` (`ItemRow`, `FilterBar`) → `EndOfDelivery`
+- `Settings` (CSV upload, pricing rule, manual links, delivery log, export/restore,
+  install, danger zone)
+- Wire the deferred behaviours the lib/hook layers left for this phase: **write
+  `price_history` once per key on confirm** (matched items, `qtyReceived > 0`), append
+  `delivery_log`, backup-on-confirm; the reconciliation-recovery add-missing-line flow.
 
-Follow architecture §price_history, §Price Change Detection, §Suggested Sell Price.
-
-Until I explicitly say otherwise, do **not** build:
-- the checklist UI, end-of-delivery workflow, reconciliation-recovery UI, or the
-  delivery workflow
-
-Test harnesses that validate the frozen modules and this phase headless / in the
-existing Vite harness are fine. No delivery-workflow UI yet.
+**This is React components only.** Do not modify the frozen lib/ or hooks/ modules; if
+a component seems to need a shape change underneath, flag it first rather than editing a
+frozen module. Build UI against the real fixtures and the existing Vite harness setup.
 
 ## Parser principles (from the architecture)
 
