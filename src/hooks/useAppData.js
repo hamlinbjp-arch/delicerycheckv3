@@ -1,22 +1,26 @@
 // src/hooks/useAppData.js
 //
-// Durable localStorage stores for DeliveryCheck (step 3, persistence phase). Manages
-// three stores; price_history is explicitly out of scope this phase. See
+// Durable localStorage stores for DeliveryCheck. See
 // docs/DeliveryCheck_Architecture_v3.md §Persistence.
 //
 //   dc.idealposExport — the parsed POS export (replaced entirely on re-upload)
 //   dc.manualLinks    — invoiceCode -> link entry (backup on every write)
-//   dc.deliveryLog    — append-only array (read/init only this phase)
+//   dc.deliveryLog    — append-only array (read/init only)
+//   dc.priceHistory   — tracking key -> { lastCost, lastSellPrice, lastInvoice, lastDate }
 //
-// Backups (manualLinks + deliveryLog) download on every manualLinks write and on
-// confirm. Restore replaces manualLinks + deliveryLog only, after validating shape.
+// Backups (manualLinks + deliveryLog + priceHistory) download on every manualLinks
+// write and on confirm. Restore replaces those three stores, after validating shape;
+// it never touches idealposExport.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+
+import { prePopulatePriceHistory as seedPriceHistory } from "../lib/utils.js";
 
 const KEYS = {
   idealpos: "dc.idealposExport",
   links: "dc.manualLinks",
   log: "dc.deliveryLog",
+  priceHistory: "dc.priceHistory",
 };
 
 // --- storage helpers ---------------------------------------------------------
@@ -89,14 +93,19 @@ export function useAppData() {
   const [idealposExport, setIdealposExportState] = useState(null);
   const [manualLinks, setManualLinksState] = useState({});
   const [deliveryLog, setDeliveryLogState] = useState([]);
+  const [priceHistory, setPriceHistoryState] = useState({});
   const [lastBackup, setLastBackup] = useState(null);
 
-  // Latest-value refs so a backup triggered elsewhere (e.g. session confirm) never
-  // reads a stale closure.
+  // Latest-value refs so a backup triggered elsewhere (e.g. session confirm) and the
+  // pre-pop action never read a stale closure.
   const linksRef = useRef(manualLinks);
   const logRef = useRef(deliveryLog);
+  const priceHistoryRef = useRef(priceHistory);
+  const idealposRef = useRef(idealposExport);
   useEffect(() => { linksRef.current = manualLinks; }, [manualLinks]);
   useEffect(() => { logRef.current = deliveryLog; }, [deliveryLog]);
+  useEffect(() => { priceHistoryRef.current = priceHistory; }, [priceHistory]);
+  useEffect(() => { idealposRef.current = idealposExport; }, [idealposExport]);
 
   // Load all stores on mount.
   useEffect(() => {
@@ -108,16 +117,18 @@ export function useAppData() {
     }
     setManualLinksState(readJSON(KEYS.links, {}));
     setDeliveryLogState(readJSON(KEYS.log, []));
+    setPriceHistoryState(readJSON(KEYS.priceHistory, {}));
   }, [storageAvailable]);
 
-  // Build + download a backup of links + log (price_history excluded this phase).
-  const writeBackup = useCallback((links, log) => {
+  // Build + download a backup of manualLinks + deliveryLog + priceHistory.
+  const writeBackup = useCallback((links, log, history) => {
     const payload = {
       type: "deliverycheck-backup",
-      version: 1,
+      version: 2,
       createdAt: new Date().toISOString(),
       manualLinks: links,
       deliveryLog: log,
+      priceHistory: history,
     };
     const filename = backupFilename();
     triggerDownload(filename, JSON.stringify(payload, null, 2));
@@ -126,12 +137,12 @@ export function useAppData() {
   }, []);
 
   const downloadBackup = useCallback(
-    () => writeBackup(linksRef.current, logRef.current),
+    () => writeBackup(linksRef.current, logRef.current, priceHistoryRef.current),
     [writeBackup]
   );
 
   // idealposExport: persist rows + metadata only; rebuild index on read. Replaces the
-  // store entirely and never touches links/log.
+  // store entirely and never touches links/log/priceHistory.
   const setIdealposExport = useCallback((parseResult) => {
     const stored = {
       rows: parseResult.rows,
@@ -147,12 +158,29 @@ export function useAppData() {
     });
   }, []);
 
+  // Pre-populate price_history from the current Idealpos export. Seeds a baseline cost
+  // for clean rows with LSTCST > 0, never overwriting an existing entry. Returns the
+  // seeded/skipped tally. (In the app this runs on CSV upload; exposed as an action so
+  // the harness can trigger it.)
+  const prePopulatePriceHistory = useCallback(() => {
+    const ie = idealposRef.current;
+    if (!ie) return { seeded: 0, skipped: 0, breakdown: null };
+    const { history, seeded, skipped, breakdown } = seedPriceHistory(
+      ie.rows,
+      ie.duplicateCodes,
+      priceHistoryRef.current
+    );
+    writeJSON(KEYS.priceHistory, history);
+    setPriceHistoryState(history);
+    return { seeded, skipped, breakdown };
+  }, []);
+
   // manualLinks writes -> persist + backup on every write.
   const setManualLink = useCallback((invoiceCode, entry) => {
     setManualLinksState((prev) => {
       const next = { ...prev, [invoiceCode]: entry };
       writeJSON(KEYS.links, next);
-      writeBackup(next, logRef.current);
+      writeBackup(next, logRef.current, priceHistoryRef.current);
       return next;
     });
   }, [writeBackup]);
@@ -162,12 +190,13 @@ export function useAppData() {
       const next = { ...prev };
       delete next[invoiceCode];
       writeJSON(KEYS.links, next);
-      writeBackup(next, logRef.current);
+      writeBackup(next, logRef.current, priceHistoryRef.current);
       return next;
     });
   }, [writeBackup]);
 
-  // Restore: validate shape, then replace manualLinks + deliveryLog only.
+  // Restore: validate shape, then replace manualLinks + deliveryLog + priceHistory.
+  // Back-compat: a v1 backup with no priceHistory key is accepted and treated as {}.
   const restoreFromBackup = useCallback((obj) => {
     const errors = [];
     if (!obj || typeof obj !== "object") errors.push("backup is not an object");
@@ -175,13 +204,18 @@ export function useAppData() {
       if (typeof obj.manualLinks !== "object" || obj.manualLinks === null || Array.isArray(obj.manualLinks))
         errors.push("manualLinks missing or not an object");
       if (!Array.isArray(obj.deliveryLog)) errors.push("deliveryLog missing or not an array");
+      if (obj.priceHistory !== undefined && (typeof obj.priceHistory !== "object" || obj.priceHistory === null || Array.isArray(obj.priceHistory)))
+        errors.push("priceHistory present but not an object");
     }
     if (errors.length) return { ok: false, errors };
 
+    const history = obj.priceHistory ?? {}; // missing -> empty (back-compat)
     writeJSON(KEYS.links, obj.manualLinks);
     writeJSON(KEYS.log, obj.deliveryLog);
+    writeJSON(KEYS.priceHistory, history);
     setManualLinksState(obj.manualLinks);
     setDeliveryLogState(obj.deliveryLog);
+    setPriceHistoryState(history);
     return { ok: true, errors: [] };
   }, []);
 
@@ -193,6 +227,8 @@ export function useAppData() {
     setManualLink,
     removeManualLink,
     deliveryLog,
+    priceHistory,
+    prePopulatePriceHistory,
     downloadBackup,
     restoreFromBackup,
     lastBackup,

@@ -8,6 +8,7 @@
 import React, { useState } from "react";
 
 import parseIdealpos from "../lib/parseIdealpos.js";
+import { suggestedSellPrice, detectPriceChange } from "../lib/utils.js";
 import { useAppData } from "../hooks/useAppData.js";
 import { useDeliverySession } from "../hooks/useDeliverySession.js";
 
@@ -34,8 +35,11 @@ function PersistInner() {
 
   const [linkCode, setLinkCode] = useState("210241");
   const [linkKey, setLinkKey] = useState("216915");
-  const [posStats, setPosStats] = useState(null);
   const [restoreMsg, setRestoreMsg] = useState(null);
+  const [ppResult, setPpResult] = useState(null);
+  const [dpcCode, setDpcCode] = useState("216915");
+  const [dpcCost, setDpcCost] = useState("14.96");
+  const [dpcResult, setDpcResult] = useState(null);
 
   async function onUploadPos(e) {
     const file = e.target.files?.[0];
@@ -124,6 +128,58 @@ function PersistInner() {
       <div style={S.card}>
         <h3 style={S.h}>deliveryLog store (read-only this phase)</h3>
         <pre style={S.pre}>{pretty(app.deliveryLog)}</pre>
+      </div>
+
+      {/* price history */}
+      <div style={S.card}>
+        <h3 style={S.h}>price_history store (pre-pop + detection)</h3>
+        <button
+          style={S.btn}
+          disabled={!ie}
+          onClick={() => setPpResult(app.prePopulatePriceHistory())}
+        >
+          Trigger pre-population from loaded export
+        </button>
+        {!ie && <span style={S.note}>(load the Idealpos export above first)</span>}
+        {ppResult && (
+          <p style={S.note}>
+            seeded <strong>{ppResult.seeded}</strong>, skipped <strong>{ppResult.skipped}</strong>{" "}
+            {ppResult.breakdown && `(blank ${ppResult.breakdown.blank} · lstcst=0 ${ppResult.breakdown.lstcstZero} · dup ${ppResult.breakdown.duplicated} · already ${ppResult.breakdown.alreadyPresent})`}
+          </p>
+        )}
+        <p style={S.note}>
+          entries: {Object.keys(app.priceHistory).length} · sample 216915:{" "}
+          {app.priceHistory["216915"] ? pretty(app.priceHistory["216915"]) : "(not seeded)"}
+        </p>
+
+        <div style={{ marginTop: 8 }}>
+          <strong style={{ fontSize: 12 }}>detectPriceChange</strong>{" "}
+          <input style={S.input} value={dpcCode} onChange={(e) => setDpcCode(e.target.value)} placeholder="invoiceCode" />
+          <input style={S.input} value={dpcCost} onChange={(e) => setDpcCost(e.target.value)} placeholder="new cost" />
+          <button
+            style={S.btn}
+            disabled={!ie}
+            onClick={() =>
+              setDpcResult(
+                detectPriceChange(dpcCode, Number(dpcCost), app.priceHistory, app.manualLinks, ie.byCode, ie.duplicateCodes)
+              )
+            }
+          >
+            Run
+          </button>
+          {dpcResult && <pre style={S.pre}>{pretty(dpcResult)}</pre>}
+          <p style={S.note}>
+            Tip: pre-populate, then run 216915 with cost 14.96 → changed:true, suggested 37.99; with 57.19 → changed:false.
+          </p>
+        </div>
+
+        <p style={{ ...S.note, marginTop: 8 }}>
+          suggestedSellPrice(14.96, 0.60, 0.99) ={" "}
+          <strong>{String(suggestedSellPrice(14.96, 0.6, 0.99))}</strong>{" "}
+          <span style={S.pill(suggestedSellPrice(14.96, 0.6, 0.99) === 37.99)}>
+            {suggestedSellPrice(14.96, 0.6, 0.99) === 37.99 ? "= 37.99 ✓" : "✗"}
+          </span>
+        </p>
       </div>
 
       {/* session */}

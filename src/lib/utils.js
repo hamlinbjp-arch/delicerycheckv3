@@ -86,3 +86,89 @@ export function matchItem(invoiceCode, rows, byCode, duplicateCodes, manualLinks
   // stored as a manual link; we never auto-resolve or mint a key here.
   return { status: "ambiguous", invoiceCode: code, candidates: bucket };
 }
+
+// ===========================================================================
+// Price history (step 4). Pure functions; the price_history store lives in
+// useAppData. See docs/DeliveryCheck_Architecture_v3.md §price_history,
+// §Price Change Detection, §Suggested Sell Price. matchItem/trackingKey above
+// are frozen and unchanged.
+// ===========================================================================
+
+const cents = (n) => Math.round(n * 100);
+
+// suggestedSellPrice(unitCost, marginPct, rounding) -> advisory sell price, or null.
+//   marginPct 0.60 => cost is 40% of sell => sell = unitCost / (1 - margin).
+//   rounding 0.99 => price ends in .99 (round the dollars up, then back off to .99).
+// Integer-cents throughout so results land exactly (e.g. 14.96 -> 37.99, not
+// 37.989999…). Guards: unitCost must be > 0, margin in [0, 1).
+//   14.96 -> 37.99 · 10.61 -> 26.99 · 9.30 -> 23.99 · 6.25 -> 15.99
+export function suggestedSellPrice(unitCost, marginPct = 0.6, rounding = 0.99) {
+  if (!(unitCost > 0)) return null;
+  if (!(marginPct >= 0 && marginPct < 1)) return null;
+  const dollars = Math.ceil(unitCost / (1 - marginPct)); // round up to whole dollar
+  const endingCents = Math.round(rounding * 100); // e.g. 99
+  return (dollars * 100 - (100 - endingCents)) / 100; // dollars-1 + .ending
+}
+
+// Derive the tracking key for an invoice code without needing `rows`: a manual link
+// carries its key directly; a clean auto-match's key is the code itself. Unmatched or
+// ambiguous codes have no stable key. Mirrors matchItem's precedence (link first).
+function keyForCode(invoiceCode, manualLinks, byCode, duplicateCodes) {
+  const code = String(invoiceCode).trim();
+  const link = manualLinks?.[code];
+  if (link && link.key != null) return link.key;
+  const bucket = byCode.get(code);
+  if (bucket && bucket.length === 1) return trackingKey(bucket[0], duplicateCodes);
+  return null; // unmatched or ambiguous -> no stable key
+}
+
+// detectPriceChange(...) -> { changed:false } or
+//   { changed:true, previousCost, previousSellPrice, suggestedSellPrice }.
+// Compares the invoice's unit cost against the last recorded cost for this item's
+// tracking key. No key, no history entry, or an equal cost -> no change (architecture:
+// unmatched/first-seen/unchanged items raise no alert).
+export function detectPriceChange(invoiceCode, costPrice, priceHistory, manualLinks, byCode, duplicateCodes) {
+  const key = keyForCode(invoiceCode, manualLinks, byCode, duplicateCodes);
+  if (key == null) return { changed: false };
+  const entry = priceHistory?.[key];
+  if (!entry) return { changed: false }; // first time seen
+  if (cents(entry.lastCost) === cents(costPrice)) return { changed: false };
+  return {
+    changed: true,
+    previousCost: entry.lastCost,
+    previousSellPrice: entry.lastSellPrice,
+    suggestedSellPrice: suggestedSellPrice(costPrice),
+  };
+}
+
+// prePopulatePriceHistory(rows, duplicateCodes, existing) -> { history, seeded,
+// skipped, breakdown }. Seeds a baseline cost from the Idealpos export: for each row
+// with LSTCST > 0 under a STABLE key, create an entry if none exists. Never overwrites.
+//
+// "Stable key" = a clean row (suppcode non-blank AND not duplicated); its key is the
+// suppcode. Blank and duplicated codes are skipped — they have no stable key (linking
+// mints one later), so seeding them would create unreachable junk entries.
+export function prePopulatePriceHistory(rows, duplicateCodes, existing = {}) {
+  const history = { ...existing };
+  const breakdown = { blank: 0, lstcstZero: 0, duplicated: 0, alreadyPresent: 0 };
+  let seeded = 0;
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const r of rows) {
+    if (r.suppcode === "") { breakdown.blank += 1; continue; }
+    if (duplicateCodes.has(r.suppcode)) { breakdown.duplicated += 1; continue; }
+    if (!(r.lstcst > 0)) { breakdown.lstcstZero += 1; continue; }
+    const key = r.suppcode; // clean row: tracking key is the suppcode
+    if (key in history) { breakdown.alreadyPresent += 1; continue; }
+    history[key] = {
+      lastCost: r.lstcst,
+      lastSellPrice: r.price,
+      lastInvoice: "idealpos-import",
+      lastDate: today,
+    };
+    seeded += 1;
+  }
+
+  const skipped = breakdown.blank + breakdown.lstcstZero + breakdown.duplicated + breakdown.alreadyPresent;
+  return { history, seeded, skipped, breakdown };
+}
