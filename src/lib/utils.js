@@ -172,3 +172,38 @@ export function prePopulatePriceHistory(rows, duplicateCodes, existing = {}) {
   const skipped = breakdown.blank + breakdown.lstcstZero + breakdown.duplicated + breakdown.alreadyPresent;
   return { history, seeded, skipped, breakdown };
 }
+
+// reconcile(items, nonProductLines, printedSubtotal) -> completeness check.
+// The UI uses this to recompute the gap after the user keys in a missing line; it
+// reproduces the parser's completeness arithmetic (integer cents) so it agrees with
+// parsePDF on the parsed inputs. See docs/DeliveryCheck_Architecture_v3.md
+// §Validation & Reconciliation.
+//   computedSubtotal = Σ item.amount + Σ shipping.amount - Σ |storeCredit.amount|
+//   tolerance (cents) = min(10, max(2, ceil(items.length / 20)))  [matches the parser]
+//   status = |gap| <= tolerance ? "pass" : "fail"
+export function reconcile(items, nonProductLines, printedSubtotal) {
+  const np = nonProductLines || {};
+  const shippingArr = np.shipping || [];
+  const creditArr = np.storeCredit || [];
+
+  const productSumC = (items || []).reduce((a, it) => a + cents(it.amount), 0);
+  const shippingC = shippingArr.reduce((a, s) => a + cents(s.amount), 0);
+  const storeCreditC = creditArr.reduce((a, sc) => a - cents(sc.amount), 0); // magnitude
+  const computedC = productSumC + shippingC - storeCreditC;
+  const printedC = cents(printedSubtotal);
+  const gapC = computedC - printedC;
+
+  const tolC = Math.min(10, Math.max(2, Math.ceil((items?.length || 0) / 20)));
+  const status = Math.abs(gapC) <= tolC ? "pass" : "fail";
+
+  return {
+    productSum: productSumC / 100,
+    shipping: shippingC / 100,
+    storeCredit: storeCreditC / 100,
+    computedSubtotal: computedC / 100,
+    printedSubtotal,
+    gap: gapC / 100,
+    tolerance: tolC / 100,
+    status,
+  };
+}

@@ -1,0 +1,148 @@
+/* DeliveryCheck — app styles. Plain CSS, mobile-first (phone in a stockroom). */
+
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --ink: #16181d;
+  --muted: #5b6470;
+  --line: #d9dde3;
+  --accent: #1a7f37;
+  --accent-ink: #ffffff;
+  --danger: #cf222e;
+  --warn-bg: #fff8e6;
+  --warn-line: #e2c200;
+  --tabbar-h: 60px;
+  --pad: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* App frame: scrollable content above a fixed bottom tab bar. */
+.app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.app__main {
+  flex: 1;
+  padding: var(--pad);
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--pad));
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Step header with Back. */
+.stephead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.stephead h1 { font-size: 18px; margin: 0; }
+.stephead__sub { color: var(--muted); font-size: 13px; }
+
+/* Cards. */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.card h2 { font-size: 15px; margin: 0 0 8px; }
+.muted { color: var(--muted); font-size: 13px; }
+
+/* Buttons — large tap targets. */
+button {
+  font: inherit;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  width: 100%;
+}
+.btn-danger { color: var(--danger); border-color: var(--danger); background: #fff; }
+.btn-link { border: none; background: none; color: var(--accent); min-height: 36px; padding: 6px; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Inputs. */
+label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+input[type="text"], input[type="number"] {
+  font: inherit;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+input[type="file"] { font-size: 14px; }
+
+/* Totals table. */
+.totals { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.totals td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.totals td:last-child { text-align: right; font-weight: 600; }
+
+/* Status badges / banners. */
+.badge { display: inline-block; padding: 4px 12px; border-radius: 14px; font-weight: 700; color: #fff; }
+.badge.pass { background: var(--accent); }
+.badge.fail { background: var(--danger); }
+.banner { padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+.banner.warn { background: var(--warn-bg); border: 1px solid var(--warn-line); }
+.banner.error { background: #fff5f5; border: 1px solid var(--danger); color: var(--danger); }
+
+/* Bottom tab bar. */
+.tabbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: flex;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  z-index: 20;
+}
+.tabbar button {
+  flex: 1;
+  border: none;
+  background: none;
+  border-radius: 0;
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.tabbar button.active { color: var(--accent); font-weight: 700; }
+.tabbar .ico { font-size: 20px; line-height: 1; }
+
+/* Resume prompt overlay. */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; z-index: 50;
+}
+.overlay .card { max-width: 420px; width: 100%; margin: 0; }
