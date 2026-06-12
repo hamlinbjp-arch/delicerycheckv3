@@ -12,6 +12,7 @@ import React, { useState } from "react";
 import { GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import parsePDF from "../lib/parsePDF.js";
+import PersistencePanel from "./PersistencePanel.jsx";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -75,7 +76,7 @@ function Table({ columns, rows, empty = "none" }) {
 const show = (v) => (v == null ? <span style={{ color: "#999" }}>null</span> : String(v));
 const checkmark = (v) => (v === true ? "✓" : v === false ? "✗" : "—");
 
-export default function Harness() {
+function ParserPanel() {
   const [fileName, setFileName] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -265,6 +266,39 @@ export default function Harness() {
             </Section>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// Two-tab harness: the original parser panel, and the persistence verification panel.
+export default function Harness() {
+  const [tab, setTab] = useState("parser");
+  const tabBtn = (id, label) => (
+    <button
+      onClick={() => setTab(id)}
+      style={{
+        fontFamily: "inherit", fontSize: 13, padding: "6px 14px", cursor: "pointer",
+        border: "1px solid #ccc", borderBottom: tab === id ? "2px solid #1a7f37" : "1px solid #ccc",
+        background: tab === id ? "#fff" : "#f2f2f2", fontWeight: tab === id ? 700 : 400,
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 4, padding: "8px 16px 0", fontFamily: "system-ui, sans-serif" }}>
+        {tabBtn("parser", "Parser")}
+        {tabBtn("persistence", "Persistence")}
+      </div>
+      {tab === "parser" ? (
+        <ParserPanel />
+      ) : (
+        <div style={{ fontFamily: "system-ui, sans-serif", maxWidth: 1100, padding: 16 }}>
+          <h1 style={{ fontSize: 18, margin: "0 0 12px" }}>DeliveryCheck — Persistence Harness</h1>
+          <PersistencePanel />
+        </div>
       )}
     </div>
   );
