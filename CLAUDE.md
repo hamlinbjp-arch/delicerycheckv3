@@ -23,28 +23,37 @@ This is a personal, offline, single-user tool. It does **not** have, and we will
 When a choice exists between a simple approach and a complex one, take the simple
 one and say why.
 
-## Current phase: PERSISTENCE + RESUMABLE SESSION
+## Current phase: PRICE HISTORY
 
-**Done and frozen** (validated against real data; don't change their output shape
+**Done and frozen** (validated/built; don't change their output shape or behaviour
 without flagging it first):
 - the WSS invoice parser (`src/lib/parsePDF.js`)
 - the Idealpos export ingest + identity sets (`src/lib/parseIdealpos.js`)
 - the matching core (`src/lib/utils.js` — `matchItem()`, `trackingKey()`)
+- the persistence layer (`src/hooks/useAppData.js`, `src/hooks/useDeliverySession.js`)
+  — the existing stores (`active_session`, Idealpos export, `manual_links`,
+  `delivery_log`), backup/restore, throttled session writes, and Resume-on-launch
 
-**Now building:** durable persistence and the resumable in-progress delivery
-(`localStorage`) — the durable stores (`active_session`, Idealpos export,
-`manual_links`, `delivery_log`), storage-check on launch, throttled session writes,
-backup/restore, and the Resume-on-launch flow. Manual links land here as the override
-layer the matching core already consumes. Follow the architecture's durability rules
-(home-screen install, backup-on-confirm and backup-on-link-change, prominent Restore).
+**Now building:** the `price_history` store (keyed by **tracking key**), its
+**pre-population from the Idealpos export**, and **price-change detection**:
+- pre-pop rule: for each export row with `LSTCST > 0`, seed `{ lastCost, lastSellPrice,
+  lastInvoice: "idealpos-import", lastDate }` — **never overwrite** an existing entry,
+  **skip blank `SUPPCODE`** rows.
+- `detectPriceChange()` and `suggestedSellPrice()` in `utils.js` (advisory; margin/
+  rounding from a setting). History is written **once per key on confirm**, only for
+  matched items with `qtyReceived > 0`.
+- Two in-scope extensions to the frozen persistence layer: **add the `price_history`
+  store alongside the existing stores in `useAppData.js`**, and **fold `price_history`
+  into the backup/restore payload** (architecture §Backup files).
+
+Follow architecture §price_history, §Price Change Detection, §Suggested Sell Price.
 
 Until I explicitly say otherwise, do **not** build:
-- price history — neither the `price_history` store, its pre-population/seeding, nor
-  the price-change detection. That is the next phase, not this one.
-- any UI: the checklist, reconciliation-recovery, end-of-delivery, the delivery workflow
+- the checklist UI, end-of-delivery workflow, reconciliation-recovery UI, or the
+  delivery workflow
 
-Test harnesses that validate the frozen modules headless are fine (the single-page
-parser harness, Node batch checks in `./tools/`). No delivery-workflow UI yet.
+Test harnesses that validate the frozen modules and this phase headless / in the
+existing Vite harness are fine. No delivery-workflow UI yet.
 
 ## Parser principles (from the architecture)
 
