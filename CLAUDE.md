@@ -23,20 +23,27 @@ This is a personal, offline, single-user tool. It does **not** have, and we will
 When a choice exists between a simple approach and a complex one, take the simple
 one and say why.
 
-## Current phase: PARSER ONLY
+## Current phase: MATCHING CORE
 
-We are building and validating the WSS invoice parser. Until I explicitly say
-otherwise, do **not** build:
-- matching logic
-- CSV import / Idealpos identity
-- localStorage / persistence
-- the delivery workflow
-- price history
-- manual links
-- the checklist UI
+**Done and frozen** (validated against real data; don't change their output shape
+without flagging it first):
+- the WSS invoice parser (`src/lib/parsePDF.js`)
+- the Idealpos export ingest + identity sets (`src/lib/parseIdealpos.js`)
 
-The only exception is a minimal, single-page test harness whose sole purpose is to
-validate the parser. No app routing, no other components.
+**Now building:** the matching core in `src/lib/utils.js` — the pure join of parsed
+invoice `items` × the POS `byCode` index into matched / ambiguous / unmatched, with
+the tracking key derived once (`trackingKey()`, `matchItem()`). Headless and
+batch-testable, like the parser.
+
+Until I explicitly say otherwise, do **not** build:
+- localStorage / persistence and the resumable session
+- manual links (the matching core treats links as an override layer wired in later)
+- price history / pre-population
+- the delivery workflow, the checklist UI, reconciliation-recovery UI, end-of-delivery
+
+Test harnesses that validate the frozen modules and the matching core headless are
+fine (the single-page parser harness, Node batch checks in `./tools/`). No app
+routing, no delivery-workflow components yet.
 
 ## Parser principles (from the architecture)
 
