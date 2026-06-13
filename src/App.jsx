@@ -12,6 +12,7 @@ import ResumePrompt from "./components/ResumePrompt.jsx";
 import Setup from "./components/delivery/Setup.jsx";
 import ReviewPanel from "./components/delivery/ReviewPanel.jsx";
 import Reconciliation from "./components/delivery/Reconciliation.jsx";
+import MatchAndLink from "./components/delivery/MatchAndLink.jsx";
 import Settings from "./components/settings/Settings.jsx";
 
 // Placeholder for delivery steps not built in this slice (Review / Match / Checklist /
@@ -46,7 +47,7 @@ export default function App() {
       case "review":
         return <ReviewPanel app={app} session={session} />;
       case "match":
-        return <StepPlaceholder title="Match & link" session={session} />;
+        return <MatchAndLink app={app} session={session} />;
       case "checklist":
         return <StepPlaceholder title="Checklist" session={session} />;
       case "end":
