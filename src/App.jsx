@@ -10,6 +10,7 @@ import { useDeliverySession } from "./hooks/useDeliverySession.js";
 import BottomTabBar from "./components/BottomTabBar.jsx";
 import ResumePrompt from "./components/ResumePrompt.jsx";
 import Setup from "./components/delivery/Setup.jsx";
+import ReviewPanel from "./components/delivery/ReviewPanel.jsx";
 import Reconciliation from "./components/delivery/Reconciliation.jsx";
 import Settings from "./components/settings/Settings.jsx";
 
@@ -43,7 +44,7 @@ export default function App() {
       case "reconcile":
         return <Reconciliation app={app} session={session} />;
       case "review":
-        return <StepPlaceholder title="Review unclassified rows" session={session} />;
+        return <ReviewPanel app={app} session={session} />;
       case "match":
         return <StepPlaceholder title="Match & link" session={session} />;
       case "checklist":
