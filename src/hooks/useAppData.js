@@ -136,10 +136,32 @@ export function useAppData() {
     return { filename, payload };
   }, []);
 
+  // Optional overrides let a caller back up values it just wrote this same tick (refs
+  // lag a render). No args = back up the current stores.
   const downloadBackup = useCallback(
-    () => writeBackup(linksRef.current, logRef.current, priceHistoryRef.current),
+    (o = {}) =>
+      writeBackup(
+        o.manualLinks ?? linksRef.current,
+        o.deliveryLog ?? logRef.current,
+        o.priceHistory ?? priceHistoryRef.current
+      ),
     [writeBackup]
   );
+
+  // Generic store writers (persist + setState, no auto-backup — the caller decides).
+  // Used by end-of-delivery confirm/undo and the Settings danger zone.
+  const setPriceHistory = useCallback((next) => {
+    writeJSON(KEYS.priceHistory, next);
+    setPriceHistoryState(next);
+  }, []);
+  const setDeliveryLog = useCallback((next) => {
+    writeJSON(KEYS.log, next);
+    setDeliveryLogState(next);
+  }, []);
+  const setManualLinks = useCallback((next) => {
+    writeJSON(KEYS.links, next);
+    setManualLinksState(next);
+  }, []);
 
   // idealposExport: persist rows + metadata only; rebuild index on read. Replaces the
   // store entirely and never touches links/log/priceHistory.
@@ -226,8 +248,11 @@ export function useAppData() {
     manualLinks,
     setManualLink,
     removeManualLink,
+    setManualLinks,
     deliveryLog,
+    setDeliveryLog,
     priceHistory,
+    setPriceHistory,
     prePopulatePriceHistory,
     downloadBackup,
     restoreFromBackup,

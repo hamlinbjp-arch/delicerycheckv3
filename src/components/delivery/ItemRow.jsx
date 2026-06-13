@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 
-import { detectPriceChange } from "../../lib/utils.js";
+import { detectPriceChange, suggestedSellPrice } from "../../lib/utils.js";
 import { searchRows, linkItem } from "./linking.js";
 
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
@@ -17,7 +17,7 @@ function statusOf(item) {
   return "partial";
 }
 
-export default function ItemRow({ item, index, app, session, ie }) {
+export default function ItemRow({ item, index, app, session, ie, pricing }) {
   const [typing, setTyping] = useState(false); // qty number entry
   const [qtyDraft, setQtyDraft] = useState("");
   const [linking, setLinking] = useState(false);
@@ -83,7 +83,7 @@ export default function ItemRow({ item, index, app, session, ie }) {
       {item.priceChange && (
         <div className="itemrow__alert">
           ⚠ Cost {money(item.priceChange.previousCost)} → {money(item.unitPrice)} · suggest sell{" "}
-          <strong>{money(item.priceChange.suggestedSellPrice)}</strong>
+          <strong>{money(suggestedSellPrice(item.unitPrice, pricing.rule.margin, pricing.rule.rounding))}</strong>
           {matched && <> (now {money(item.match.sellPrice)})</>}
         </div>
       )}

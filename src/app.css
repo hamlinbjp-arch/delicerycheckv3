@@ -192,3 +192,11 @@ input[type="file"] { font-size: 14px; }
 .itemrow__link .result, .itemrow__edit { margin-top: 6px; }
 .itemrow__link .result { display: block; width: 100%; text-align: left; }
 .itemrow__link input { margin-top: 6px; }
+
+/* ── Undo bar (after confirm) ─────────────────────────────────────────────── */
+.undobar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--ink); color: #fff; padding: 10px 14px;
+}
+.undobar button { background: transparent; color: #fff; border-color: rgba(255,255,255,0.6); min-height: 40px; }

@@ -24,7 +24,7 @@ function statusOf(it) {
   return "partial";
 }
 
-export default function DeliveryChecklist({ app, session }) {
+export default function DeliveryChecklist({ app, session, pricing }) {
   const s = session.session;
   const ie = app.idealposExport;
   const meta = s.invoiceMeta || {};
@@ -98,7 +98,7 @@ export default function DeliveryChecklist({ app, session }) {
           <p className="muted" style={{ padding: "12px 4px" }}>No items match.</p>
         ) : (
           visible.map(({ it, index }) => (
-            <ItemRow key={index} item={it} index={index} app={app} session={session} ie={ie} />
+            <ItemRow key={index} item={it} index={index} app={app} session={session} ie={ie} pricing={pricing} />
           ))
         )}
       </div>
