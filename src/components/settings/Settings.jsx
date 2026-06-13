@@ -50,6 +50,10 @@ export default function Settings({ app, pricing }) {
     return row ? row.desc : `(key ${entry.key})`;
   }
 
+  const isInstalled =
+    window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+
   const age = ie ? daysSince(ie.uploadedAt) : null;
   const links = Object.entries(app.manualLinks);
   const marginPct = Math.round(pricing.rule.margin * 100);
@@ -153,16 +157,23 @@ export default function Settings({ app, pricing }) {
         </div>
       </div>
 
-      {/* Install */}
-      <div className="card">
-        <h2>Add to Home Screen</h2>
-        <p className="muted">
-          Install DeliveryCheck to your home screen (Share → "Add to Home Screen" on iOS;
-          the install icon in the address bar on Android/desktop). Installed apps keep
-          their stored data — browsers can evict a normal site's storage after about a
-          week, which would wipe your links and price history.
-        </p>
-      </div>
+      {/* Install — hide once running as an installed standalone app. */}
+      {isInstalled ? (
+        <div className="card">
+          <h2>Installed ✓</h2>
+          <p className="muted">Running as a home-screen app — your stored data is durable.</p>
+        </div>
+      ) : (
+        <div className="card">
+          <h2>Add to Home Screen</h2>
+          <p className="muted">
+            Install DeliveryCheck to your home screen (Share → "Add to Home Screen" on iOS;
+            the install icon in the address bar on Android/desktop). Installed apps keep
+            their stored data — browsers can evict a normal site's storage after about a
+            week, which would wipe your links and price history.
+          </p>
+        </div>
+      )}
 
       {/* Danger zone */}
       <div className="card" style={{ borderColor: "var(--danger)" }}>
