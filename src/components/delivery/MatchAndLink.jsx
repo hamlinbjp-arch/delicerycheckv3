@@ -13,7 +13,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 
-import { matchItem, trackingKey } from "../../lib/utils.js";
+import { matchItem } from "../../lib/utils.js";
+import { searchRows, linkItem } from "./linking.js";
 
 const money = (n) => (n == null ? "—" : `$${Number(n).toFixed(2)}`);
 
@@ -46,20 +47,8 @@ export default function MatchAndLink({ app, session }) {
     session.updateSession({ items });
   }, [ie, s, app.manualLinks, session]);
 
-  // Live search results for the active unmatched group. Substring over desc (or code);
-  // capped at 30 so a 7k-row export stays instant at the box.
-  const results = useMemo(() => {
-    if (!activeCode || !ie || query.trim().length < 2) return [];
-    const q = query.trim().toUpperCase();
-    const out = [];
-    for (const r of ie.rows) {
-      if (r.desc.toUpperCase().includes(q) || r.suppcode.includes(query.trim())) {
-        out.push(r);
-        if (out.length >= 30) break;
-      }
-    }
-    return out;
-  }, [activeCode, query, ie]);
+  // Live search results for the active unmatched group (shared helper; instant on 7k rows).
+  const results = useMemo(() => (activeCode && ie ? searchRows(ie.rows, query) : []), [activeCode, query, ie]);
 
   if (!ie) {
     return <div className="card"><p className="muted">No Idealpos export loaded.</p></div>;
@@ -84,15 +73,7 @@ export default function MatchAndLink({ app, session }) {
   const unmatchedItemCount = s.items.filter((it) => it.match && it.match.status !== "matched").length;
 
   function linkItemTo(code, row, via) {
-    const clean = row.suppcode !== "" && !ie.duplicateCodes.has(row.suppcode);
-    const key = trackingKey(row, ie.duplicateCodes); // clean -> suppcode; else a linkId
-    const entry = clean ? { key } : { key, snapshot: { suppcode: row.suppcode, desc: row.desc, price: row.price } };
-    app.setManualLink(code, entry); // persists + triggers backup
-    const match = { status: "matched", via, key, desc: row.desc, sellPrice: row.price };
-    session.updateSession((prev) => ({
-      ...prev,
-      items: prev.items.map((it) => (it.invoiceCode === code ? { ...it, match } : it)),
-    }));
+    linkItem(app, session, ie, code, row, via); // shared: setManualLink (backup) + update match
     setLinkedCount((c) => c + 1);
     setActiveCode(null);
     setQuery("");
